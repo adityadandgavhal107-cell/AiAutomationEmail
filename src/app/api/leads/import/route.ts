@@ -20,9 +20,19 @@ export async function POST(request: Request) {
 
   const rows = leads.map((l: any) => ({ ...l, user_id: user.id, status: 'new' }))
 
+  // Deduplicate rows by email within the uploaded batch to prevent PostgreSQL ON CONFLICT DO UPDATE error
+  const uniqueRowsMap = new Map()
+  rows.forEach((row: any) => {
+    const key = row.email.toLowerCase().trim()
+    if (!uniqueRowsMap.has(key)) {
+      uniqueRowsMap.set(key, row)
+    }
+  })
+  const uniqueRows = Array.from(uniqueRowsMap.values())
+
   const { data, error } = await supabase
     .from('leads')
-    .upsert(rows, { onConflict: 'user_id,email', ignoreDuplicates: false })
+    .upsert(uniqueRows, { onConflict: 'user_id,email', ignoreDuplicates: false })
     .select()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

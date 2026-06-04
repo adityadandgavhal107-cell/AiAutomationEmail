@@ -138,3 +138,16 @@ export interface DashboardStats {
   potentialCustomers: number
   customers: number
 }
+
+export interface LeadMessage {
+  id: string
+  lead_id: string
+  user_id: string
+  sender: 'lead' | 'user' | 'ai'
+  subject: string | null
+  body: string
+  gmail_message_id: string | null
+  gmail_thread_id: string | null
+  created_at: string
+}
+

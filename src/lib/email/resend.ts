@@ -1,6 +1,12 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+})
 
 export interface SendEmailOptions {
   to: string
@@ -8,9 +14,10 @@ export interface SendEmailOptions {
   body: string
   fromEmail?: string
   fromName?: string
+  replyTo?: string
   attachments?: Array<{
     filename: string
-    content: Buffer
+    content: Buffer | string
   }>
 }
 
@@ -21,14 +28,15 @@ export interface SendEmailResult {
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
-  const from = `${options.fromName || process.env.RESEND_FROM_NAME || 'Outreach'} <${
-    options.fromEmail || process.env.RESEND_FROM_EMAIL || 'outreach@yourdomain.com'
-  }>`
+  const senderName = options.fromName || process.env.GMAIL_FROM_NAME || process.env.RESEND_FROM_NAME || 'Prosmart Concepts'
+  const from = `${senderName} <${process.env.GMAIL_USER}>`
+  const replyTo = options.replyTo || process.env.REPLY_TO_EMAIL || process.env.GMAIL_USER
 
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from,
-      to: [options.to],
+      replyTo,
+      to: options.to,
       subject: options.subject,
       html: options.body.replace(/\n/g, '<br/>'),
       text: options.body,
@@ -38,15 +46,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       })),
     })
 
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, messageId: data?.id }
-  } catch (err) {
+    return { success: true, messageId: info.messageId }
+  } catch (err: any) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error sending email',
+      error: err.message || 'Unknown error sending email via Gmail',
     }
   }
 }

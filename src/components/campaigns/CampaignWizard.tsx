@@ -68,6 +68,7 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
   const [aiLength, setAiLength] = useState<AiLength>('medium')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [attachments, setAttachments] = useState<{ filename: string, content: string }[]>([])
   const [previewLead, setPreviewLead] = useState<Lead | null>(null)
 
   useEffect(() => {
@@ -101,6 +102,10 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
           length: aiLength,
         }),
       })
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        throw new Error('Session expired. Please refresh the page and log in again.')
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setSubject(data.subject)
@@ -130,6 +135,10 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
           body: body || null,
         }),
       })
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        throw new Error('Session expired. Please refresh the page and log in again.')
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCampaignId(data.id)
@@ -150,10 +159,22 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
         id = await handleSaveDraft()
         if (!id) return
       }
-      const res = await fetch(`/api/campaigns/${id}/send`, { method: 'POST' })
+      const res = await fetch(`/api/campaigns/${id}/send`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachments: attachments.length > 0 ? attachments : undefined })
+      })
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        throw new Error('Session expired. Please refresh the page and log in again.')
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success(`🎉 Campaign sent! ${data.emailsSent}/${data.total} emails delivered.`)
+      if (data.errorSummary) {
+        toast.warning(`Campaign sent with issues: ${data.emailsSent}/${data.total} delivered. ${data.errorSummary}`)
+      } else {
+        toast.success(`🎉 Campaign sent! ${data.emailsSent}/${data.total} emails delivered.`)
+      }
       onComplete()
     } catch (err: any) {
       toast.error(err.message || 'Send failed')
@@ -423,6 +444,43 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
                     className="font-mono text-sm"
                     placeholder="Email body..."
                   />
+                </div>
+                <div className="space-y-1.5 pt-2">
+                  <Label>Attachments (Optional)</Label>
+                  <Input 
+                    type="file" 
+                    multiple 
+                    className="cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        Array.from(e.target.files).forEach(file => {
+                          const reader = new FileReader()
+                          reader.onload = (event) => {
+                            const base64 = (event.target?.result as string).split(',')[1]
+                            setAttachments(prev => [...prev, { filename: file.name, content: base64 }])
+                          }
+                          reader.readAsDataURL(file)
+                        })
+                      }
+                      e.target.value = '' // reset input
+                    }} 
+                  />
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {attachments.map((a, i) => (
+                        <div key={i} className="flex items-center gap-1.5 bg-muted/50 border border-border px-2 py-1.5 rounded-md text-xs">
+                          <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="truncate max-w-[150px] font-medium">{a.filename}</span>
+                          <button 
+                            onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} 
+                            className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

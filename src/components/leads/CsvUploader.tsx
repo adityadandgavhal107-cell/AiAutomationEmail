@@ -26,8 +26,12 @@ export function CsvUploader({ onImportComplete }: CsvUploaderProps) {
     const file = acceptedFiles[0]
     if (!file) return
 
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      toast.error('Please upload a valid CSV file.')
+    const isCsv = file.type === 'text/csv' || file.name.endsWith('.csv')
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel'
+    const isJson = file.name.endsWith('.json') || file.type === 'application/json'
+
+    if (!isCsv && !isExcel && !isJson) {
+      toast.error('Please upload a valid CSV, Excel, or JSON file.')
       return
     }
 
@@ -51,7 +55,7 @@ export function CsvUploader({ onImportComplete }: CsvUploaderProps) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to import CSV.')
+        throw new Error(data.error || 'Failed to import file.')
       }
 
       setResult({
@@ -92,13 +96,13 @@ export function CsvUploader({ onImportComplete }: CsvUploaderProps) {
     }}>
       <DialogTrigger render={<Button variant="outline" className="flex items-center gap-2" />}>
         <UploadCloud className="w-4 h-4" />
-        <span>Import CSV</span>
+        <span>Import Leads</span>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Import Leads from CSV</DialogTitle>
+          <DialogTitle>Import Leads (CSV, Excel, JSON)</DialogTitle>
           <DialogDescription>
-            Upload a CSV file containing your leads. We support fields like email, first_name, last_name, company, title, and department.
+            Upload a CSV, Excel, or JSON file containing your leads. We support fields like email, first_name, last_name, company, title, and department.
           </DialogDescription>
         </DialogHeader>
 
@@ -121,7 +125,7 @@ export function CsvUploader({ onImportComplete }: CsvUploaderProps) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-semibold">
-                    {isDragActive ? 'Drop the file here' : 'Drag & drop your CSV file here'}
+                    {isDragActive ? 'Drop the file here' : 'Drag & drop your file here (CSV, Excel, JSON)'}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     or click to browse from your computer

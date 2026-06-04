@@ -59,8 +59,8 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <p className="text-sm font-bold text-foreground leading-tight">AI Outreach</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">Automation Platform</p>
+            <p className="text-sm font-bold text-foreground leading-tight">PROSMART</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Email CRM</p>
           </div>
         )}
       </div>

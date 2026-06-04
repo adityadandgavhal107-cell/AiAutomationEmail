@@ -43,9 +43,17 @@ export default function CampaignsPage() {
     setSending(id)
     try {
       const res = await fetch(`/api/campaigns/${id}/send`, { method: 'POST' })
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        throw new Error('Session expired. Please refresh the page and log in again.')
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Send failed')
-      toast.success(`Campaign sent! ${data.emailsSent}/${data.total} emails delivered.`)
+      if (data.errorSummary) {
+        toast.warning(`Campaign sent with issues: ${data.emailsSent}/${data.total} delivered. ${data.errorSummary}`)
+      } else {
+        toast.success(`Campaign sent! ${data.emailsSent}/${data.total} emails delivered.`)
+      }
       fetchCampaigns()
     } catch (err: any) {
       toast.error(err.message || 'Failed to send campaign')

@@ -5,13 +5,35 @@ import { generateEmail } from '@/lib/ai/generate-email'
 import type { AiTone, AiLength, TemplateType } from '@/types'
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  console.log(`[SEND_ROUTE] Incoming request for campaign ID: ${id}`)
+
+  let attachments: any[] | undefined = undefined
+  try {
+    const jsonBody = await req.json()
+    attachments = jsonBody?.attachments
+  } catch (e) {
+    // Body might be empty
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) {
+    console.log('[SEND_ROUTE] Unauthorized (no user)')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Check Gmail credentials early
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.log('[SEND_ROUTE] Missing Gmail credentials')
+    return NextResponse.json(
+      { error: 'GMAIL_USER or GMAIL_APP_PASSWORD is not configured in .env.local.' },
+      { status: 500 }
+    )
+  }
 
   const { data: campaign, error: campaignError } = await supabase
     .from('campaigns')
@@ -21,10 +43,12 @@ export async function POST(
     .single()
 
   if (campaignError || !campaign) {
+    console.log(`[SEND_ROUTE] Campaign not found. Error: ${campaignError?.message}, ID: ${id}, UserID: ${user.id}`)
     return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
   }
 
   if (campaign.status === 'sent') {
+    console.log(`[SEND_ROUTE] Campaign already sent`)
     return NextResponse.json({ error: 'Campaign already sent' }, { status: 400 })
   }
 
@@ -53,7 +77,9 @@ export async function POST(
   await supabase.from('campaigns').update({ status: 'sending' }).eq('id', campaign.id)
 
   let emailsSent = 0
+  let emailsFailed = 0
   const results = []
+  const errors: string[] = []
 
   for (const lead of leads) {
     try {
@@ -87,7 +113,7 @@ export async function POST(
         body = generated.body
       }
 
-      const result = await sendEmail({ to: lead.email, subject, body })
+      const result = await sendEmail({ to: lead.email, subject, body, attachments })
 
       await supabase.from('campaign_recipients').upsert({
         campaign_id: campaign.id,
@@ -96,21 +122,40 @@ export async function POST(
         sent_at: result.success ? new Date().toISOString() : null,
       })
 
-      if (result.success) emailsSent++
+      if (result.success) {
+        emailsSent++
+      } else {
+        emailsFailed++
+        const errMsg = `${lead.email}: ${result.error || 'Unknown error'}`
+        errors.push(errMsg)
+      }
       results.push({ email: lead.email, success: result.success, error: result.error })
     } catch (err) {
+      emailsFailed++
+      const errMsg = `${lead.email}: ${err instanceof Error ? err.message : String(err)}`
+      errors.push(errMsg)
       results.push({ email: lead.email, success: false, error: String(err) })
     }
   }
 
+  const finalStatus = emailsSent > 0 ? 'sent' : 'failed'
   await supabase
     .from('campaigns')
     .update({
-      status: emailsSent > 0 ? 'sent' : 'failed',
+      status: finalStatus,
       emails_sent: emailsSent,
       sent_at: new Date().toISOString(),
     })
     .eq('id', campaign.id)
 
-  return NextResponse.json({ success: true, emailsSent, total: leads.length, results })
+  return NextResponse.json({
+    success: emailsSent > 0,
+    emailsSent,
+    emailsFailed,
+    total: leads.length,
+    results,
+    ...(errors.length > 0 && {
+      errorSummary: `${emailsFailed} email(s) failed: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? ` ...and ${errors.length - 3} more` : ''}`
+    }),
+  })
 }
