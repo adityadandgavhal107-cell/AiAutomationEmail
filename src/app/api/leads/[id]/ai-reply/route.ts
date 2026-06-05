@@ -82,7 +82,7 @@ INSTRUCTIONS:
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'AI Outreach Automation Platform',
+      'X-Title': 'PROSMART-AI Outreach Automation Platform',
     },
     body: JSON.stringify({
       model,

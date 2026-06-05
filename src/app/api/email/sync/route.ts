@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 
+// Force Node.js runtime so imapflow can use net/tls (Edge runtime doesn't support these)
+export const runtime = 'nodejs'
+
 // Helper to extract only the direct reply text, stripping out original quoted thread
 function cleanEmailBody(text: string): string {
   if (!text) return ''
@@ -60,6 +63,14 @@ export async function POST() {
   // Map email addresses to lead details (case-insensitive keys)
   const leadMap = new Map(leads.map(l => [l.email.toLowerCase().trim(), l]))
 
+  // PRE-FETCH all existing gmail_message_ids for this user to avoid per-message DB queries
+  const { data: existingMsgs } = await supabase
+    .from('lead_messages')
+    .select('gmail_message_id')
+    .eq('user_id', user.id)
+
+  const existingMsgIds = new Set((existingMsgs || []).map(m => m.gmail_message_id).filter(Boolean))
+
   const client = new ImapFlow({
     host: 'imap.gmail.com',
     port: 993,
@@ -75,39 +86,47 @@ export async function POST() {
   let convertedCount = 0
   const syncedMessages: any[] = []
 
-  try {
+  // 25-second absolute timeout guard
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Sync timed out after 25 seconds. Please try again.')), 25000)
+  )
+
+  const syncPromise = async () => {
     await client.connect()
 
     const lock = await client.getMailboxLock('INBOX')
     try {
-      // Search for messages received in the last 14 days
+      // Reduced from 14 → 7 days for faster response
       const sinceDate = new Date()
-      sinceDate.setDate(sinceDate.getDate() - 14)
+      sinceDate.setDate(sinceDate.getDate() - 7)
       const searchResults = await client.search({ since: sinceDate })
 
-      // Fetch messages details
       if (searchResults && Array.isArray(searchResults)) {
-        for (const uid of searchResults) {
-          const message = await client.fetchOne(uid, { source: true, envelope: true, uid: true })
-          if (!message || !message.source) continue
+        // Process in batches to prevent memory spikes
+        const MAX_PER_SYNC = 100
+        const limited = searchResults.slice(-MAX_PER_SYNC) // most recent N
 
-          const parsed = await simpleParser(message.source)
-          const fromAddress = parsed.from?.value[0]?.address?.toLowerCase().trim()
-          if (!fromAddress) continue
+        if (limited.length > 0) {
+          // Fetch envelopes in one fast batch request
+          const messagesGen = client.fetch(limited.join(','), { envelope: true })
 
-          const matchingLead = leadMap.get(fromAddress)
-          if (matchingLead) {
-            const gmailMessageId = parsed.messageId || `gmail_sync_${uid}_${parsed.date?.getTime() || Date.now()}`
-            
-            // Check if message is already in our DB to prevent duplication
-            const { data: existingMsg } = await supabase
-              .from('lead_messages')
-              .select('id')
-              .eq('gmail_message_id', gmailMessageId)
-              .maybeSingle()
+          for await (const msg of messagesGen) {
+            const fromAddress = msg.envelope?.from?.[0]?.address?.toLowerCase().trim()
+            if (!fromAddress) continue
 
-            if (existingMsg) continue
+            const matchingLead = leadMap.get(fromAddress)
+            if (!matchingLead) continue
 
+            const gmailMessageId = msg.envelope?.messageId || `gmail_sync_${msg.uid}_${msg.envelope?.date?.getTime() || Date.now()}`
+
+            // Skip duplicates using pre-fetched set (no extra DB round-trip)
+            if (existingMsgIds.has(gmailMessageId)) continue
+
+            // Fetch the full source for this matching message only
+            const fullMessage = await client.fetchOne(msg.uid, { source: true })
+            if (!fullMessage || !fullMessage.source) continue
+
+            const parsed = await simpleParser(fullMessage.source)
             const rawBody = parsed.text || parsed.textAsHtml || ''
             const cleanedBody = cleanEmailBody(rawBody)
 
@@ -118,7 +137,7 @@ export async function POST() {
                 lead_id: matchingLead.id,
                 user_id: user.id,
                 sender: 'lead',
-                subject: parsed.subject || 'Re: Outreach',
+                subject: parsed.subject || msg.envelope?.subject || 'Re: Outreach',
                 body: cleanedBody,
                 gmail_message_id: gmailMessageId,
                 created_at: parsed.date || new Date(),
@@ -128,13 +147,14 @@ export async function POST() {
 
             if (!insertError && insertedMsg) {
               syncedCount++
+              existingMsgIds.add(gmailMessageId) // prevent duplicates in same run
               syncedMessages.push({
                 leadId: matchingLead.id,
                 email: matchingLead.email,
-                subject: parsed.subject,
+                subject: parsed.subject || msg.envelope?.subject || 'Re: Outreach',
               })
 
-              // Auto-promote lead status to 'potential_customer' if it is not customer
+              // Auto-promote lead status to 'potential_customer' if it is not already customer
               if (matchingLead.status !== 'customer' && matchingLead.status !== 'potential_customer') {
                 const { error: updateError } = await supabase
                   .from('leads')
@@ -143,7 +163,6 @@ export async function POST() {
 
                 if (!updateError) {
                   convertedCount++
-                  // Update map status locally in case we process another email from the same lead in this batch
                   matchingLead.status = 'potential_customer'
                 }
               }
@@ -154,6 +173,10 @@ export async function POST() {
     } finally {
       lock.release()
     }
+  }
+
+  try {
+    await Promise.race([syncPromise(), timeoutPromise])
   } catch (err: any) {
     console.error('[IMAP_SYNC_ERROR]', err)
     return NextResponse.json({ error: `Gmail sync failed: ${err.message}` }, { status: 500 })

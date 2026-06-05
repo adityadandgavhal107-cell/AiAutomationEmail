@@ -29,7 +29,10 @@ export interface SendEmailResult {
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   const senderName = options.fromName || process.env.GMAIL_FROM_NAME || process.env.RESEND_FROM_NAME || 'Prosmart Concepts'
-  const from = `${senderName} <${process.env.GMAIL_USER}>`
+  // Use GMAIL_FROM_EMAIL if set (for sending via Gmail alias like products@prosmart.in),
+  // otherwise fall back to the authenticated Gmail account.
+  const senderEmail = process.env.GMAIL_FROM_EMAIL || process.env.GMAIL_USER
+  const from = `${senderName} <${senderEmail}>`
   const replyTo = options.replyTo || process.env.REPLY_TO_EMAIL || process.env.GMAIL_USER
 
   try {

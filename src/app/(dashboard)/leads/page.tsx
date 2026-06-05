@@ -98,6 +98,19 @@ export default function LeadsPage() {
     }
   }
 
+  const handleBulkDeleteLeads = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map(id =>
+        fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      ))
+      toast.success(`Deleted ${ids.length} leads successfully.`)
+      fetchLeads()
+    } catch (err) {
+      toast.error('Could not delete some leads.')
+      fetchLeads()
+    }
+  }
+
   const handleAddLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
@@ -273,6 +286,7 @@ export default function LeadsPage() {
           onPageChange={setPage}
           onStatusChange={handleStatusChange}
           onDelete={handleDeleteLead}
+          onBulkDelete={handleBulkDeleteLeads}
         />
       </div>
     </div>

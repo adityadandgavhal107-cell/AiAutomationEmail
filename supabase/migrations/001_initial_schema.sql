@@ -1,5 +1,5 @@
 -- ============================================================
--- AI Outreach Automation Platform — Initial Schema
+-- PROSMART EMAIL CRM Automation Platform — Initial Schema
 -- Run this in the Supabase SQL Editor
 -- ============================================================
 

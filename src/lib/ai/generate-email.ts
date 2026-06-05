@@ -17,12 +17,31 @@ function buildSystemPrompt(tone: string, length: string): string {
     long: 'Write a detailed email — around 200 to 300 words with thorough context.',
   }
 
+  // Build real sender signature from env
+  const senderName = process.env.RESEND_FROM_NAME || 'Your Name'
+  const senderEmail = process.env.RESEND_FROM_EMAIL || ''
+  const senderTitle = process.env.SENDER_JOB_TITLE || ''
+  const senderCompany = process.env.SENDER_COMPANY || process.env.RESEND_FROM_NAME || ''
+  const senderPhone = process.env.SENDER_PHONE || ''
+
+  const signatureBlock = [
+    `Best regards,`,
+    senderName,
+    senderTitle,
+    senderCompany,
+    senderPhone,
+    senderEmail,
+  ].filter(Boolean).join('\n')
+
   return `You are an expert B2B sales and outreach copywriter.
 
 Your task is to write a highly personalized cold outreach email.
 
 Tone: ${toneInstructions[tone] || toneInstructions.professional}
 Length: ${lengthInstructions[length] || lengthInstructions.medium}
+
+SENDER SIGNATURE (use EXACTLY as shown, never use placeholder brackets like [Your Name]):
+${signatureBlock}
 
 CRITICAL RULES:
 1. Read the product description carefully and extract the most RELEVANT selling points for this specific recipient based on their role, department, and organization.
@@ -31,6 +50,7 @@ CRITICAL RULES:
 4. Make the email feel human, not templated.
 5. End with a clear, low-friction call to action.
 6. Generate a compelling subject line (under 60 characters).
+7. NEVER use placeholder text like [Your Name], [Your Company], [Your Phone Number] etc. Always use the real sender info provided above.
 
 Respond ONLY in this exact JSON format:
 {
@@ -93,7 +113,7 @@ export async function generateEmail(input: GenerateEmailInput): Promise<Generate
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'AI Outreach Automation Platform',
+      'X-Title': 'PROSMART-AI  Automation Platform',
     },
     body: JSON.stringify({
       model,

@@ -5,11 +5,10 @@ import { Topbar } from '@/components/layout/Topbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import {
   Mail, KeyRound, User, Bell, Shield, ChevronRight,
-  Copy, Eye, EyeOff, Check
+  Copy, Eye, EyeOff, Check, RefreshCw, CheckCircle2, ArrowUpRight, Loader2
 } from 'lucide-react'
 
 const TABS = [
@@ -32,11 +31,35 @@ export default function SettingsPage() {
   const [fromName, setFromName] = useState(process.env.NEXT_PUBLIC_FROM_NAME || '')
   const [fromEmail, setFromEmail] = useState('')
 
+  // Sync Replies
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ synced: number; converted: number; details: { email: string; subject: string }[] } | null>(null)
+
   const handleCopy = (key: string, value: string) => {
     navigator.clipboard.writeText(value)
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
     toast.success('Copied to clipboard')
+  }
+
+  const handleSyncReplies = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/email/sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Sync failed')
+      setSyncResult(data)
+      if (data.synced === 0) {
+        toast.info('No new replies found in the last 7 days.')
+      } else {
+        toast.success(`Synced ${data.synced} new repl${data.synced === 1 ? 'y' : 'ies'}!`)
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Sync failed. Check your Gmail credentials.')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const toggleShowKey = (key: string) => {
@@ -139,46 +162,129 @@ export default function SettingsPage() {
 
           {/* Email Tab */}
           {activeTab === 'email' && (
-            <div className="glass-card rounded-2xl border border-border p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold">Email Sending Configuration</h2>
-                <p className="text-sm text-muted-foreground mt-1">Configure sender details used in outreach emails.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="from-name">From Name</Label>
-                  <Input
-                    id="from-name"
-                    value={fromName}
-                    onChange={e => setFromName(e.target.value)}
-                    placeholder="Your Company"
-                  />
-                  <p className="text-xs text-muted-foreground">Displayed as the sender name in emails.</p>
+            <div className="space-y-4">
+              {/* Sender Config Card */}
+              <div className="glass-card rounded-2xl border border-border p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold">Email Sending Configuration</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Configure sender details used in outreach emails.</p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="from-email">From Email</Label>
-                  <Input
-                    id="from-email"
-                    type="email"
-                    value={fromEmail}
-                    onChange={e => setFromEmail(e.target.value)}
-                    placeholder="hello@yourcompany.com"
-                  />
-                  <p className="text-xs text-muted-foreground">Must be a verified domain in your Resend account.</p>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="from-name">From Name</Label>
+                    <Input
+                      id="from-name"
+                      value={fromName}
+                      onChange={e => setFromName(e.target.value)}
+                      placeholder="Your Company"
+                    />
+                    <p className="text-xs text-muted-foreground">Displayed as the sender name in emails.</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="from-email">From Email</Label>
+                    <Input
+                      id="from-email"
+                      type="email"
+                      value={fromEmail}
+                      onChange={e => setFromEmail(e.target.value)}
+                      placeholder="hello@yourcompany.com"
+                    />
+                    <p className="text-xs text-muted-foreground">Must be a verified domain in your Resend account.</p>
+                  </div>
                 </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-600 dark:text-amber-400">
+                  <p className="font-medium mb-1">⚠️ Configuration Note</p>
+                  <p className="text-xs">Email credentials are configured in your <code className="bg-muted px-1 rounded">.env.local</code> file.
+                  Update <code className="bg-muted px-1 rounded">RESEND_FROM_NAME</code>, <code className="bg-muted px-1 rounded">RESEND_FROM_EMAIL</code>, <code className="bg-muted px-1 rounded">SENDER_JOB_TITLE</code>, and <code className="bg-muted px-1 rounded">SENDER_PHONE</code> there to fix email signatures.</p>
+                </div>
+
+                <Button onClick={() => toast.success('Settings saved!')}>
+                  Save Configuration
+                </Button>
               </div>
 
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-600 dark:text-amber-400">
-                <p className="font-medium mb-1">⚠️ Configuration Note</p>
-                <p className="text-xs">Email credentials are configured in your <code className="bg-muted px-1 rounded">.env.local</code> file. 
-                Update <code className="bg-muted px-1 rounded">RESEND_FROM_NAME</code> and <code className="bg-muted px-1 rounded">RESEND_FROM_EMAIL</code> there.</p>
-              </div>
+              {/* Sync Replies Card */}
+              <div className="glass-card rounded-2xl border border-border p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <RefreshCw className="w-5 h-5 text-primary" />
+                    Sync Replies from Gmail
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Scan your Gmail inbox for replies from leads in the last 7 days. New replies are saved to each lead's message thread.
+                  </p>
+                </div>
 
-              <Button onClick={() => toast.success('Settings saved!')}>
-                Save Configuration
-              </Button>
+                <Button
+                  onClick={handleSyncReplies}
+                  disabled={syncing}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  {syncing ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Syncing inbox...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" /> Sync Now</>
+                  )}
+                </Button>
+
+                {syncing && (
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground animate-pulse">
+                    Connecting to Gmail IMAP and scanning last 7 days of inbox...
+                  </div>
+                )}
+
+                {syncResult && !syncing && (
+                  <div className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+                    {/* Summary */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{syncResult.synced}</p>
+                          <p className="text-xs text-muted-foreground">new repl{syncResult.synced === 1 ? 'y' : 'ies'}</p>
+                        </div>
+                      </div>
+                      {syncResult.converted > 0 && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                            <ArrowUpRight className="w-4 h-4 text-amber-500" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-amber-500">{syncResult.converted}</p>
+                            <p className="text-xs text-muted-foreground">promoted to Potential Customer</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {syncResult.synced === 0 && (
+                      <p className="text-sm text-muted-foreground">No new replies found in the last 7 days.</p>
+                    )}
+
+                    {/* Per-lead details */}
+                    {syncResult.details.length > 0 && (
+                      <div className="space-y-2 border-t border-border pt-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Replies Found</p>
+                        {syncResult.details.map((d, i) => (
+                          <div key={i} className="flex items-start gap-3 bg-muted/30 rounded-lg px-3 py-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{d.email}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{d.subject || 'No subject'}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

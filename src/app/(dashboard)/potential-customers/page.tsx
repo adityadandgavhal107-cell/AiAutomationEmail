@@ -19,24 +19,24 @@ export default function PotentialCustomersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  
+
   // Message related states
   const [messages, setMessages] = useState<LeadMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [newMessageBody, setNewMessageBody] = useState('')
   const [replySubject, setReplySubject] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
-  
+
   // AI related states
   const [generatingAi, setGeneratingAi] = useState(false)
-  
+
   // Inbox Sync state
   const [syncing, setSyncing] = useState(false)
 
   // Local notes editing state
   const [notesText, setNotesText] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
-  
+
   // Convert state
   const [converting, setConverting] = useState<string | null>(null)
 
@@ -51,7 +51,7 @@ export default function PotentialCustomersPage() {
       const data = await res.json()
       const fetchedLeads = data.data || []
       setLeads(fetchedLeads)
-      
+
       if (selectIdAfterFetch) {
         const found = fetchedLeads.find((l: Lead) => l.id === selectIdAfterFetch)
         if (found) setSelectedLead(found)
@@ -75,7 +75,7 @@ export default function PotentialCustomersPage() {
       if (!res.ok) throw new Error('Failed to fetch messages')
       const data = await res.json()
       setMessages(data.data || [])
-      
+
       // Default reply subject based on last message
       const msgs = data.data || []
       if (msgs.length > 0) {
@@ -124,7 +124,7 @@ export default function PotentialCustomersPage() {
       toast.success(
         `Inbox synced! ${data.synced} new messages loaded. ${data.converted} leads promoted.`
       )
-      
+
       // Refresh leads list, preserving selected lead
       const currentSelectedId = selectedLead?.id
       await fetchLeads(currentSelectedId)
@@ -202,7 +202,7 @@ export default function PotentialCustomersPage() {
       })
       if (!res.ok) throw new Error('Failed to save notes')
       toast.success('Lead notes updated!')
-      
+
       // Update local state in leads list
       setLeads(prev =>
         prev.map(l => (l.id === selectedLead.id ? { ...l, notes: notesText } : l))
@@ -268,7 +268,7 @@ export default function PotentialCustomersPage() {
     <div className="animate-fade-in-up flex flex-col h-[calc(100vh-64px)]">
       <Topbar
         title="Conversations & Potential Customers"
-        subtitle="Track replies, communicate directly with high-intent leads, and draft AI outreach responses."
+        subtitle="Track replies, communicate directly with high-intent leads, and draft PROSMART EMAIL CRM responses."
       >
         <Button
           onClick={handleSyncInbox}
@@ -321,9 +321,8 @@ export default function PotentialCustomersPage() {
                   <button
                     key={lead.id}
                     onClick={() => setSelectedLead(lead)}
-                    className={`w-full text-left p-4 transition-all flex items-start gap-3 hover:bg-muted/30 ${
-                      isSelected ? 'bg-primary/10 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
-                    }`}
+                    className={`w-full text-left p-4 transition-all flex items-start gap-3 hover:bg-muted/30 ${isSelected ? 'bg-primary/10 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
+                      }`}
                   >
                     <div className="w-9 h-9 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0 text-yellow-600 font-bold text-sm">
                       {(lead.first_name?.[0] || lead.email[0]).toUpperCase()}
@@ -435,11 +434,10 @@ export default function PotentialCustomersPage() {
                           className={`flex ${isLead ? 'justify-start' : 'justify-end'}`}
                         >
                           <div
-                            className={`max-w-[75%] rounded-2xl p-4 shadow-sm space-y-1 ${
-                              isLead
+                            className={`max-w-[75%] rounded-2xl p-4 shadow-sm space-y-1 ${isLead
                                 ? 'bg-muted/40 border border-border/80 text-foreground rounded-tl-none'
                                 : 'bg-primary text-primary-foreground rounded-tr-none'
-                            }`}
+                              }`}
                           >
                             {msg.subject && (
                               <div className={`text-[10px] uppercase font-bold tracking-wider opacity-60`}>
@@ -450,9 +448,8 @@ export default function PotentialCustomersPage() {
                               {msg.body}
                             </div>
                             <div
-                              className={`text-[9px] flex items-center gap-1 mt-2 opacity-50 ${
-                                isLead ? 'text-muted-foreground justify-start' : 'text-primary-foreground justify-end'
-                              }`}
+                              className={`text-[9px] flex items-center gap-1 mt-2 opacity-50 ${isLead ? 'text-muted-foreground justify-start' : 'text-primary-foreground justify-end'
+                                }`}
                             >
                               <Clock className="w-2.5 h-2.5" />
                               {new Date(msg.created_at).toLocaleString([], {
@@ -482,7 +479,7 @@ export default function PotentialCustomersPage() {
                       className="h-8 text-xs flex-1"
                     />
                   </div>
-                  
+
                   <div className="relative">
                     <Textarea
                       value={newMessageBody}
@@ -539,7 +536,7 @@ export default function PotentialCustomersPage() {
                             : 'Not specified'}
                         </span>
                       </div>
-                      
+
                       {selectedLead.organization_name && (
                         <div>
                           <span className="text-[11px] text-muted-foreground block font-normal">Organization</span>

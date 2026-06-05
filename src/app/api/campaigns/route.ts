@@ -50,5 +50,22 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  if (body.audience_type === 'selected' && Array.isArray(body.selected_lead_ids) && body.selected_lead_ids.length > 0) {
+    const recipientRows = body.selected_lead_ids.map((leadId: string) => ({
+      campaign_id: data.id,
+      lead_id: leadId,
+      status: 'pending',
+    }))
+    const { error: recipientError } = await supabase
+      .from('campaign_recipients')
+      .insert(recipientRows)
+
+    if (recipientError) {
+      // Clean up the campaign so we don't leave a broken campaign draft
+      await supabase.from('campaigns').delete().eq('id', data.id)
+      return NextResponse.json({ error: recipientError.message }, { status: 500 })
+    }
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Star,
+  UserCheck,
   Package,
   FileText,
   Megaphone,
@@ -15,6 +16,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  CalendarClock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -26,9 +28,11 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
   { href: '/potential-customers', label: 'Potential Customers', icon: Star },
+  { href: '/customers', label: 'Customers', icon: UserCheck },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/templates', label: 'Templates', icon: FileText },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
+  { href: '/schedule', label: 'Schedule', icon: CalendarClock },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
