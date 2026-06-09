@@ -175,11 +175,21 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
         }),
       })
       const contentType = res.headers.get('content-type') || ''
+      if (!res.ok) {
+        let errMsg = 'Generation failed'
+        if (contentType.includes('application/json')) {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } else {
+          const text = await res.text()
+          errMsg = `Server error (${res.status}): ${text.substring(0, 150)}`
+        }
+        throw new Error(errMsg)
+      }
       if (!contentType.includes('application/json')) {
-        throw new Error('Session expired. Please refresh the page and log in again.')
+        throw new Error('Unexpected response format from server (not JSON).')
       }
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
       setSubject(data.subject)
       setBody(data.body)
       toast.success('Email generated!')
@@ -209,11 +219,21 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
         }),
       })
       const contentType = res.headers.get('content-type') || ''
+      if (!res.ok) {
+        let errMsg = 'Failed to save campaign'
+        if (contentType.includes('application/json')) {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } else {
+          const text = await res.text()
+          errMsg = `Server error (${res.status}): ${text.substring(0, 150)}`
+        }
+        throw new Error(errMsg)
+      }
       if (!contentType.includes('application/json')) {
-        throw new Error('Session expired. Please refresh the page and log in again.')
+        throw new Error('Unexpected response format from server (not JSON).')
       }
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
       setCampaignId(data.id)
       return data.id
     } catch (err: any) {
@@ -238,8 +258,19 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
         body: JSON.stringify({ attachments: attachments.length > 0 ? attachments : undefined })
       })
       const contentType = res.headers.get('content-type') || ''
+      if (!res.ok && res.status !== 429) {
+        let errMsg = 'Failed to send campaign'
+        if (contentType.includes('application/json')) {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } else {
+          const text = await res.text()
+          errMsg = `Server error (${res.status}): ${text.substring(0, 150)}`
+        }
+        throw new Error(errMsg)
+      }
       if (!contentType.includes('application/json')) {
-        throw new Error('Session expired. Please refresh the page and log in again.')
+        throw new Error('Unexpected response format from server (not JSON).')
       }
       const data = await res.json()
 
@@ -248,8 +279,6 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
         onComplete()
         return
       }
-
-      if (!res.ok) throw new Error(data.error)
 
       if (data.hasQueue) {
         toast.success(`✅ Sent ${data.emailsSent} today! 📬 ${data.queued} emails queued across ${data.daysToComplete - 1} more day(s).`)

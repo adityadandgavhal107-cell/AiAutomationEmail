@@ -74,8 +74,19 @@ export default function CampaignsPage() {
     try {
       const res = await fetch(`/api/campaigns/${id}/send`, { method: 'POST' })
       const contentType = res.headers.get('content-type') || ''
+      if (!res.ok && res.status !== 429) {
+        let errMsg = 'Send failed'
+        if (contentType.includes('application/json')) {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } else {
+          const text = await res.text()
+          errMsg = `Server error (${res.status}): ${text.substring(0, 150)}`
+        }
+        throw new Error(errMsg)
+      }
       if (!contentType.includes('application/json')) {
-        throw new Error('Session expired. Please refresh the page and log in again.')
+        throw new Error('Unexpected response format from server (not JSON).')
       }
       const data = await res.json()
 
@@ -84,8 +95,6 @@ export default function CampaignsPage() {
         fetchCampaigns()
         return
       }
-
-      if (!res.ok) throw new Error(data.error || 'Send failed')
 
       if (data.hasQueue) {
         toast.success(
