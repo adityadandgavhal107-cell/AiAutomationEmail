@@ -11,8 +11,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: {
-    default: 'AI Outreach Automation Platform',
-    template: '%s | AI Outreach',
+    default: 'PROSMART-AI Outreach Automation Platform',
+    template: '%s | PROSMART',
   },
   description:
     'AI-powered outreach automation platform for managing leads, generating personalized emails, and running campaigns at scale.',

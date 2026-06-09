@@ -62,7 +62,7 @@ export default function SignupPage() {
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold tracking-tight">Create Account</CardTitle>
         <CardDescription>
-          Get started with AI Outreach by creating a new account
+          Get started with PROSMART EMAIL CRM by creating a new account
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -78,7 +78,6 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="bg-background/50"
-              suppressHydrationWarning
             />
           </div>
 
@@ -93,7 +92,6 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-background/50"
-              suppressHydrationWarning
             />
           </div>
 
@@ -108,11 +106,10 @@ export default function SignupPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="bg-background/50"
-              suppressHydrationWarning
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading} suppressHydrationWarning>
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
