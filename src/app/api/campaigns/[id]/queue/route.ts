@@ -162,6 +162,31 @@ export async function POST(
 
   const leadMap = new Map(leads.map((l: any) => [l.id, l]))
 
+  // Fetch campaign attachments from DB
+  const { data: dbAttachments } = await supabase
+    .from('campaign_attachments')
+    .select('*')
+    .eq('campaign_id', campaign.id)
+
+  const inlineImgRecord = dbAttachments?.find((a: any) => a.mime_type === 'inline_image')
+  const inlineImage = inlineImgRecord
+    ? { filename: inlineImgRecord.file_name, content: inlineImgRecord.storage_path }
+    : undefined
+
+  const normalAttachments = dbAttachments
+    ?.filter((a: any) => a.mime_type !== 'inline_image')
+    .map((a: any) => ({
+      filename: a.file_name,
+      content: Buffer.from(a.storage_path, 'base64'),
+    })) || []
+
+  const requestAttachments = attachments?.map((a: any) => ({
+    filename: a.filename || a.file_name,
+    content: Buffer.from(a.content || a.storage_path, 'base64')
+  })) || []
+
+  const mergedAttachments = [...normalAttachments, ...requestAttachments]
+
   let emailsSent = 0
   let emailsFailed = 0
   const errors: string[] = []
@@ -207,7 +232,13 @@ export async function POST(
       subject = personalizePlaceholders(subject, lead)
       body = personalizePlaceholders(body, lead)
 
-      const result = await sendEmail({ to: lead.email, subject, body, attachments })
+      const result = await sendEmail({
+        to: lead.email,
+        subject,
+        body,
+        attachments: mergedAttachments.length > 0 ? mergedAttachments : undefined,
+        inlineImage
+      })
 
       await supabase
         .from('campaign_recipients')

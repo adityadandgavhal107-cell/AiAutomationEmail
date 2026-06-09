@@ -96,6 +96,7 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [attachments, setAttachments] = useState<{ filename: string, content: string }[]>([])
+  const [inlineImage, setInlineImage] = useState<{ filename: string, content: string } | null>(null)
   const [previewLead, setPreviewLead] = useState<Lead | null>(null)
 
   useEffect(() => {
@@ -216,6 +217,8 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
           subject: subject || null,
           body: body || null,
           selected_lead_ids: audienceType === 'selected' ? Array.from(selectedLeadIds) : undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
+          inlineImage: inlineImage || undefined,
         }),
       })
       const contentType = res.headers.get('content-type') || ''
@@ -255,7 +258,10 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
       const res = await fetch(`/api/campaigns/${id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachments: attachments.length > 0 ? attachments : undefined })
+        body: JSON.stringify({
+          attachments: attachments.length > 0 ? attachments : undefined,
+          inlineImage: inlineImage || undefined,
+        })
       })
       const contentType = res.headers.get('content-type') || ''
       if (!res.ok && res.status !== 429) {
@@ -558,7 +564,10 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
             </div>
             <div className="grid gap-3">
               <button
-                onClick={() => setSelectedProduct(null)}
+                onClick={() => {
+                  setSelectedProduct(null)
+                  setAttachments([])
+                }}
                 className={`text-left p-4 rounded-xl border-2 transition-all ${
                   !selectedProduct ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                 }`}
@@ -569,7 +578,18 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
               {products.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => setSelectedProduct(p)}
+                  onClick={() => {
+                    setSelectedProduct(p)
+                    if (p.attachments && Array.isArray(p.attachments)) {
+                      const copied = p.attachments.map((a: any) => ({
+                        filename: a.file_name,
+                        content: a.storage_path
+                      }))
+                      setAttachments(copied)
+                    } else {
+                      setAttachments([])
+                    }
+                  }}
                   className={`text-left p-4 rounded-xl border-2 transition-all ${
                     selectedProduct?.id === p.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                   }`}
@@ -702,6 +722,48 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <Label>Inline Image (Optional) — Placed at the top of the email</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="cursor-pointer"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0]
+                        const reader = new FileReader()
+                        reader.onload = (event) => {
+                          const base64 = (event.target?.result as string).split(',')[1]
+                          setInlineImage({ filename: file.name, content: base64 })
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                      e.target.value = ''
+                    }}
+                  />
+                  {inlineImage && (
+                    <div className="mt-2 space-y-2">
+                      <div className="inline-flex items-center gap-1.5 bg-primary/10 border border-primary/20 px-2 py-1.5 rounded-md text-xs">
+                        <Paperclip className="w-3.5 h-3.5 text-primary" />
+                        <span className="truncate max-w-[150px] font-medium text-primary">{inlineImage.filename}</span>
+                        <button
+                          onClick={() => setInlineImage(null)}
+                          className="text-primary hover:text-red-500 transition-colors ml-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="relative w-40 h-28 border border-border rounded-lg overflow-hidden bg-muted/30">
+                        <img
+                          src={`data:image/png;base64,${inlineImage.content}`}
+                          alt="Inline preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -765,6 +827,15 @@ export function CampaignWizard({ onClose, onComplete }: CampaignWizardProps) {
                   
                   {/* Email Body */}
                   <div className="p-6 bg-card/25 min-h-[200px] max-h-80 overflow-y-auto">
+                    {inlineImage && (
+                      <div className="mb-4 max-w-full rounded-lg overflow-hidden border border-border shadow-sm bg-muted/20">
+                        <img
+                          src={`data:image/png;base64,${inlineImage.content}`}
+                          alt="Embedded inline flyer"
+                          className="w-full h-auto object-contain max-h-[300px] mx-auto block"
+                        />
+                      </div>
+                    )}
                     <div className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90 font-sans">
                       {(() => {
                         let processed = body

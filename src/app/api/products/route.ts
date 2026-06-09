@@ -33,5 +33,20 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (body.attachments && Array.isArray(body.attachments) && body.attachments.length > 0) {
+    const attachmentRows = body.attachments.map((a: any) => ({
+      product_id: data.id,
+      file_name: a.filename || a.file_name || 'attachment',
+      storage_path: a.content || a.storage_path || '',
+      file_size: a.file_size || null,
+      mime_type: a.mime_type || null
+    }))
+    const { error: attError } = await supabase
+      .from('product_attachments')
+      .insert(attachmentRows)
+    if (attError) return NextResponse.json({ error: attError.message }, { status: 500 })
+  }
+
   return NextResponse.json({ data }, { status: 201 })
 }

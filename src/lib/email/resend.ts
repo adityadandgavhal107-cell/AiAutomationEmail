@@ -19,6 +19,10 @@ export interface SendEmailOptions {
     filename: string
     content: Buffer | string
   }>
+  inlineImage?: {
+    filename: string
+    content: string
+  }
 }
 
 export interface SendEmailResult {
@@ -29,24 +33,35 @@ export interface SendEmailResult {
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   const senderName = options.fromName || process.env.GMAIL_FROM_NAME || process.env.RESEND_FROM_NAME || 'Prosmart Concepts'
-  // Use GMAIL_FROM_EMAIL if set (for sending via Gmail alias like products@prosmart.in),
-  // otherwise fall back to the authenticated Gmail account.
   const senderEmail = process.env.GMAIL_FROM_EMAIL || process.env.GMAIL_USER
   const from = `${senderName} <${senderEmail}>`
   const replyTo = options.replyTo || process.env.REPLY_TO_EMAIL || process.env.GMAIL_USER
 
   try {
+    const mailAttachments = options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+    })) || []
+
+    let htmlBody = options.body.replace(/\n/g, '<br/>')
+
+    if (options.inlineImage) {
+      htmlBody = `<img src="cid:inline_image" style="max-width:100%; height:auto; display:block; margin:0 auto 20px auto; border-radius:8px;" /><br/>` + htmlBody
+      mailAttachments.push({
+        filename: options.inlineImage.filename,
+        content: Buffer.from(options.inlineImage.content, 'base64'),
+        cid: 'inline_image',
+      } as any)
+    }
+
     const info = await transporter.sendMail({
       from,
       replyTo,
       to: options.to,
       subject: options.subject,
-      html: options.body.replace(/\n/g, '<br/>'),
+      html: htmlBody,
       text: options.body,
-      attachments: options.attachments?.map((a) => ({
-        filename: a.filename,
-        content: a.content,
-      })),
+      attachments: mailAttachments,
     })
 
     return { success: true, messageId: info.messageId }

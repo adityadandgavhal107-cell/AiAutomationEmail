@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Package, Edit2, Trash2, Loader2, Calendar, FileText } from 'lucide-react'
+import { Plus, Package, Edit2, Trash2, Loader2, Calendar, FileText, X, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, truncate } from '@/lib/utils'
 
@@ -25,6 +25,7 @@ export default function ProductsPage() {
   // Form State
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [attachments, setAttachments] = useState<{ filename: string, content: string, file_size?: number, mime_type?: string }[]>([])
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -48,6 +49,7 @@ export default function ProductsPage() {
     setEditingProduct(null)
     setName('')
     setDescription('')
+    setAttachments([])
     setOpen(true)
   }
 
@@ -55,6 +57,12 @@ export default function ProductsPage() {
     setEditingProduct(product)
     setName(product.name)
     setDescription(product.description || '')
+    setAttachments(product.attachments?.map((a: any) => ({
+      filename: a.file_name,
+      content: a.storage_path,
+      file_size: a.file_size,
+      mime_type: a.mime_type
+    })) || [])
     setOpen(true)
   }
 
@@ -70,7 +78,7 @@ export default function ProductsPage() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, attachments }),
       })
 
       const data = await response.json()
@@ -216,6 +224,50 @@ export default function ProductsPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 className="resize-none"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Product Attachments (Optional)</Label>
+              <Input
+                type="file"
+                multiple
+                className="cursor-pointer text-sm"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    Array.from(e.target.files).forEach(file => {
+                      const reader = new FileReader()
+                      reader.onload = (event) => {
+                        const base64 = (event.target?.result as string).split(',')[1]
+                        setAttachments(prev => [...prev, {
+                          filename: file.name,
+                          content: base64,
+                          file_size: file.size,
+                          mime_type: file.type
+                        }])
+                      }
+                      reader.readAsDataURL(file)
+                    })
+                  }
+                  e.target.value = ''
+                }}
+              />
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1 border border-border/50 rounded-lg">
+                  {attachments.map((a, i) => (
+                    <div key={i} className="flex items-center gap-1.5 bg-muted/60 border border-border px-2 py-1 rounded-md text-xs">
+                      <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="truncate max-w-[150px] font-medium">{a.filename}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

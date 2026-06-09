@@ -50,6 +50,39 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Save attachments/inline image to campaign_attachments
+  const attachmentRows: any[] = []
+  if (body.attachments && Array.isArray(body.attachments)) {
+    body.attachments.forEach((att: any) => {
+      attachmentRows.push({
+        campaign_id: data.id,
+        file_name: att.filename || att.file_name || 'attachment',
+        storage_path: att.content || att.storage_path || '',
+        mime_type: 'attachment'
+      })
+    })
+  }
+
+  if (body.inlineImage && body.inlineImage.content) {
+    attachmentRows.push({
+      campaign_id: data.id,
+      file_name: body.inlineImage.filename || 'inline_image.png',
+      storage_path: body.inlineImage.content,
+      mime_type: 'inline_image'
+    })
+  }
+
+  if (attachmentRows.length > 0) {
+    const { error: attError } = await supabase
+      .from('campaign_attachments')
+      .insert(attachmentRows)
+    if (attError) {
+      // Clean up the campaign so we don't leave a broken campaign draft
+      await supabase.from('campaigns').delete().eq('id', data.id)
+      return NextResponse.json({ error: attError.message }, { status: 500 })
+    }
+  }
+
   if (body.audience_type === 'selected' && Array.isArray(body.selected_lead_ids) && body.selected_lead_ids.length > 0) {
     const recipientRows = body.selected_lead_ids.map((leadId: string) => ({
       campaign_id: data.id,
