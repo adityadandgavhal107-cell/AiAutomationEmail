@@ -5,6 +5,7 @@ import { type Lead } from '@/types'
 export interface CsvRow {
   email?: string
   Email?: string
+  'Email ID'?: string
   first_name?: string
   'First Name'?: string
   FirstName?: string
@@ -72,7 +73,7 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
       total = rawData.length
 
       rawData.forEach((row: any, idx: number) => {
-        const email = getField(row, 'email', 'Email', 'EMAIL', 'E-mail 1 - Value')
+        const email = getField(row, 'email', 'Email', 'EMAIL', 'Email ID', 'E-mail 1 - Value')
         if (!email || !email.includes('@')) {
           errors.push(`Row ${idx + 2}: Invalid or missing email`)
           return
@@ -98,7 +99,7 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
       total = rawData.length
 
       rawData.forEach((row, idx) => {
-        const email = getField(row, 'email', 'Email', 'EMAIL', 'E-mail 1 - Value')
+        const email = getField(row, 'email', 'Email', 'EMAIL', 'Email ID', 'E-mail 1 - Value')
         if (!email || !email.includes('@')) {
           errors.push(`Row ${idx + 2}: Invalid or missing email`)
           return
@@ -130,7 +131,7 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
       } else {
         total = results.data.length
         results.data.forEach((row: any, idx: number) => {
-          const email = getField(row, 'email', 'Email', 'EMAIL', 'E-mail 1 - Value')
+          const email = getField(row, 'email', 'Email', 'EMAIL', 'Email ID', 'E-mail 1 - Value')
           if (!email || !email.includes('@')) {
             errors.push(`Row ${idx + 2}: Invalid or missing email`)
             return
