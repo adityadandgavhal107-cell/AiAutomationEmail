@@ -220,22 +220,36 @@ export async function POST(
       subject = personalizePlaceholders(subject, lead)
       body = personalizePlaceholders(body, lead)
 
+      // Pre-upsert to generate/retrieve the tracking ID (UUID)
+      const { data: recipientData, error: recipientError } = await supabase
+        .from('campaign_recipients')
+        .upsert({
+          campaign_id: campaign.id,
+          lead_id: lead.id,
+          status: 'pending',
+        }, { onConflict: 'campaign_id,lead_id' })
+        .select('id')
+        .single()
+
+      if (recipientError || !recipientData) {
+        throw new Error(recipientError?.message || 'Failed to create recipient tracking record')
+      }
+
       const result = await sendEmail({
         to: lead.email,
         subject,
         body,
         attachments: mergedAttachments.length > 0 ? mergedAttachments : undefined,
-        inlineImage
+        inlineImage,
+        trackingId: recipientData.id,
       })
 
-      await supabase.from('campaign_recipients').upsert({
-        campaign_id: campaign.id,
-        lead_id: lead.id,
+      await supabase.from('campaign_recipients').update({
         status: result.success ? 'sent' : 'failed',
         sent_at: result.success ? new Date().toISOString() : null,
         error_message: result.success ? null : result.error,
         scheduled_for: null,
-      }, { onConflict: 'campaign_id,lead_id' })
+      }).eq('id', recipientData.id)
 
       if (result.success) {
         emailsSent++

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Topbar } from '@/components/layout/Topbar'
-import { Loader2, TrendingUp, Users, Send, Star, UserCheck, Inbox, Clock, AlertCircle } from 'lucide-react'
+import { Loader2, TrendingUp, Users, Send, Star, UserCheck, Inbox, Clock, AlertCircle, Eye } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -31,6 +31,9 @@ interface Recipient {
   lead_id: string
   status: 'pending' | 'sent' | 'failed'
   sent_at: string | null
+  is_opened?: boolean
+  opened_at?: string | null
+  open_count?: number
 }
 
 const STATUS_COLORS = {
@@ -50,6 +53,7 @@ const DELIVERY_COLORS = {
 export default function AnalyticsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [globalRecipients, setGlobalRecipients] = useState<Recipient[]>([])
   const [loading, setLoading] = useState(true)
 
   // Campaign specific state
@@ -70,6 +74,16 @@ export default function AnalyticsPage() {
 
         setLeads(leadsData.data || [])
         setCampaigns(campaignsData.data || [])
+
+        // Fetch global recipient stats to calculate opens and open rates
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('campaign_recipients')
+          .select('lead_id, status, sent_at, is_opened, opened_at, open_count')
+        
+        if (!error && data) {
+          setGlobalRecipients(data)
+        }
       } catch (err) {
         console.error('Failed to fetch analytics base data', err)
       } finally {
@@ -91,7 +105,7 @@ export default function AnalyticsPage() {
         const supabase = createClient()
         const { data, error } = await supabase
           .from('campaign_recipients')
-          .select('lead_id, status, sent_at')
+          .select('lead_id, status, sent_at, is_opened, opened_at, open_count')
           .eq('campaign_id', selectedCampaignId)
 
         if (error) throw error
@@ -122,28 +136,38 @@ export default function AnalyticsPage() {
   let sentEmailsVal = 0
   let pendingEmailsVal = 0
   let failedEmailsVal = 0
+  let openedEmailsVal = 0
+  let openRateVal = 0
 
   if (isCampaignSelected) {
     sentEmailsVal = recipients.filter(r => r.status === 'sent').length
     pendingEmailsVal = recipients.filter(r => r.status === 'pending').length
     failedEmailsVal = recipients.filter(r => r.status === 'failed').length
+    openedEmailsVal = recipients.filter(r => r.is_opened).length
+    openRateVal = sentEmailsVal > 0 ? parseFloat(((openedEmailsVal / sentEmailsVal) * 100).toFixed(1)) : 0
   } else {
-    sentEmailsVal = campaigns.reduce((acc, c) => acc + (c.emails_sent || 0), 0)
+    sentEmailsVal = globalRecipients.filter(r => r.status === 'sent').length
+    pendingEmailsVal = globalRecipients.filter(r => r.status === 'pending').length
+    failedEmailsVal = globalRecipients.filter(r => r.status === 'failed').length
+    openedEmailsVal = globalRecipients.filter(r => r.is_opened).length
+    openRateVal = sentEmailsVal > 0 ? parseFloat(((openedEmailsVal / sentEmailsVal) * 100).toFixed(1)) : 0
   }
 
   const kpis = isCampaignSelected
     ? [
         { label: 'Leads Targeted', value: totalLeadsVal, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
         { label: 'Emails Sent', value: sentEmailsVal, icon: Send, color: 'text-green-500', bg: 'bg-green-500/10' },
+        { label: 'Emails Opened', value: openedEmailsVal, icon: Eye, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+        { label: 'Open Rate', value: `${openRateVal}%`, icon: TrendingUp, color: 'text-purple-500', bg: 'bg-purple-500/10' },
         { label: 'Pending in Queue', value: pendingEmailsVal, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-        { label: 'Failed Sends', value: failedEmailsVal, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-        { label: 'Converted Customers', value: customersVal, icon: UserCheck, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+        { label: 'Converted Customers', value: customersVal, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10' },
       ]
     : [
         { label: 'Total Leads', value: totalLeadsVal, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
         { label: 'Campaigns Run', value: campaigns.length, icon: TrendingUp, color: 'text-purple-500', bg: 'bg-purple-500/10' },
         { label: 'Total Emails Sent', value: sentEmailsVal, icon: Send, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-        { label: 'Potential Customers', value: potentialCustomersVal, icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+        { label: 'Emails Opened', value: openedEmailsVal, icon: Eye, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+        { label: 'Open Rate', value: `${openRateVal}%`, icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
         { label: 'Converted Customers', value: customersVal, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10' },
       ]
 
@@ -242,7 +266,7 @@ export default function AnalyticsPage() {
         ) : (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {kpis.map(kpi => {
                 const Icon = kpi.icon
                 return (
@@ -251,7 +275,7 @@ export default function AnalyticsPage() {
                       <Icon className={`w-5 h-5 ${kpi.color}`} />
                     </div>
                     <div>
-                      <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value.toLocaleString()}</div>
+                      <div className={`text-2xl font-bold ${kpi.color}`}>{typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">{kpi.label}</div>
                     </div>
                   </div>
@@ -414,6 +438,7 @@ export default function AnalyticsPage() {
                           <th className="py-2.5">Company</th>
                           <th className="py-2.5">Lead Stage</th>
                           <th className="py-2.5">Delivery Status</th>
+                          <th className="py-2.5">Open Status</th>
                           <th className="py-2.5 text-right">Sent Time</th>
                         </tr>
                       </thead>
@@ -447,6 +472,16 @@ export default function AnalyticsPage() {
                                 }`}>
                                   {r.status}
                                 </span>
+                              </td>
+                              <td className="py-2.5">
+                                {r.is_opened ? (
+                                  <span className="text-xs font-semibold text-cyan-500 flex items-center gap-1">
+                                    <Eye className="w-3.5 h-3.5" />
+                                    Opened ({r.open_count || 1}x)
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Unopened</span>
+                                )}
                               </td>
                               <td className="py-2.5 text-right text-xs text-muted-foreground">
                                 {r.sent_at ? new Date(r.sent_at).toLocaleString() : '—'}

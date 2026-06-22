@@ -23,6 +23,7 @@ export interface SendEmailOptions {
     filename: string
     content: string
   }
+  trackingId?: string
 }
 
 export interface SendEmailResult {
@@ -52,6 +53,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
         content: Buffer.from(options.inlineImage.content, 'base64'),
         cid: 'inline_image',
       } as any)
+    }
+
+    if (options.trackingId) {
+      const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email/track-open?id=${options.trackingId}`
+      htmlBody += `<br/><img src="${trackingUrl}" width="1" height="1" style="display:none; width:1px; height:1px;" alt="" />`
     }
 
     const info = await transporter.sendMail({

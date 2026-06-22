@@ -123,7 +123,7 @@ export async function POST() {
             if (existingMsgIds.has(gmailMessageId)) continue
 
             // Fetch the full source for this matching message only
-            const fullMessage = await client.fetchOne(msg.uid, { source: true })
+            const fullMessage = await client.fetchOne(msg.uid, { source: true }, { uid: true })
             if (!fullMessage || !fullMessage.source) continue
 
             const parsed = await simpleParser(fullMessage.source)

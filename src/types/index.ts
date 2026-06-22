@@ -87,6 +87,9 @@ export interface CampaignRecipient {
   status: RecipientStatus
   sent_at: string | null
   lead?: Lead
+  is_opened?: boolean
+  opened_at?: string | null
+  open_count?: number
 }
 
 export interface CampaignAttachment {
